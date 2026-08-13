@@ -136,6 +136,55 @@ async def hero_autocomplete(
     return [app_commands.Choice(name=n, value=n) for n in matches[:25]]
 
 
+class ItemConverter(commands.Converter):
+    """Resolves a shop item by name. /v1/assets/items also contains hero
+    weapons/abilities (distinguished by a "type" field) -- only "upgrade"
+    entries are real purchasable shop items, so those are the only ones
+    matched here.
+    """
+
+    async def convert(self, ctx: commands.Context, argument: str) -> int:
+        items = await ctx.cog.api.get_items()
+        shop_items = [i for i in items if i.get("type") == "upgrade"]
+        return _match_item(shop_items, argument)
+
+
+def _match_item(items: List[dict], argument: str) -> int:
+    arg_lower = argument.strip().lower()
+    for i in items:
+        if i.get("name", "").lower() == arg_lower:
+            return i["id"]
+    names = [i.get("name", "") for i in items]
+    close = difflib.get_close_matches(argument, names, n=1, cutoff=0.6)
+    if close:
+        for i in items:
+            if i.get("name") == close[0]:
+                return i["id"]
+    raise commands.BadArgument(
+        f"No item found matching `{argument}`."
+        + (f" Did you mean `{close[0]}`?" if close else "")
+    )
+
+
+async def item_autocomplete(
+    interaction: discord.Interaction, current: str
+) -> List[app_commands.Choice[str]]:
+    cog = interaction.client.get_cog("Deadlock")
+    if cog is None:
+        return []
+    try:
+        items = await cog.api.get_items()
+    except UpstreamUnavailableError:
+        return []
+    current_lower = current.lower()
+    matches = [
+        i.get("name", "")
+        for i in items
+        if i.get("type") == "upgrade" and current_lower in i.get("name", "").lower()
+    ]
+    return [app_commands.Choice(name=n, value=n) for n in matches[:25]]
+
+
 def stats_enabled_check():
     async def predicate(ctx: commands.Context) -> bool:
         if ctx.guild is None:

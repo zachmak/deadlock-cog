@@ -20,6 +20,7 @@ from .mixins.analytics import AnalyticsCommands
 from .mixins.news import NewsPoller
 from .mixins.profile import ProfileCommands
 from .mixins.settings import SettingsCommands
+from .mixins.social import SocialCommands
 
 # Fixed forever once released -- do not change.
 CONFIG_IDENTIFIER = 3735929292
@@ -29,6 +30,7 @@ class Deadlock(
     AccountCommands,
     ProfileCommands,
     AnalyticsCommands,
+    SocialCommands,
     SettingsCommands,
     NewsPoller,
     commands.Cog,

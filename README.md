@@ -50,9 +50,24 @@ public unauthenticated rate limits.
 | `deadlock whoami` | Show your linked account and current rank. |
 | `deadlock profile [player]` | Show a player's profile and rank (defaults to your linked account). |
 | `deadlock matches [player] [count]` | Show a player's recent match history. |
+| `deadlock top [player] [count]` | A player's best heroes, ranked by matches played. |
+| `deadlock performance [player]` | Approximate playstyle tags (e.g. "Hard Carry", "Support") derived from recent stats. |
+| `deadlock match <match_id>` | Full breakdown of a specific match: both rosters, heroes, K/D/A, net worth. |
+| `deadlock synergy [player] [matches]` | Best teammates from recent matches, by win rate together. |
+| `deadlock rivals [player] [matches]` | Toughest opponents from recent matches. |
 | `deadlock heroes [sort] [min_matches]` | Global hero win-rate leaderboard. |
 | `deadlock items [sort] [min_matches]` | Global item win-rate leaderboard. |
+| `deadlock hero <name>` | Hero info: lore, role, playstyle, and abilities. |
+| `deadlock item <name>` | Item info: description, tier, and cost. |
+| `deadlock counter <hero>` | Heroes that counter a given hero, by win rate against them. |
+| `deadlock build <hero>` | Best-performing items for a hero, by win rate. |
 | `deadlock leaderboard <region> [hero]` | Regional ranked player leaderboard. |
+| `deadlock random` | Pick a random hero to play. |
+
+`synergy`/`rivals` are derived, not a direct API feature -- they analyze your
+recent match history (capped at 20 matches) by fetching each match's full
+roster, so they're slower (a few seconds) and cost more API calls than other
+commands.
 
 `<player>` accepts a Steam64 ID, a numeric deadlock-api `account_id`, a
 `steamcommunity.com/profiles/<id>` URL, or a display name (resolved via

@@ -136,6 +136,19 @@ class DeadlockAPIClient:
         )
         return data or []
 
+    async def get_player_hero_stats(self, account_id: int) -> List[Dict[str, Any]]:
+        """Per-player, per-hero aggregates (matches_played, wins, kills,
+        kills_per_min, damage_per_min, accuracy, etc.) -- used for `deadlock
+        top` and `deadlock performance`.
+        """
+        data = await self._request(
+            "GET", "/v1/players/hero-stats", params={"account_ids": account_id}
+        )
+        return data or []
+
+    async def get_match_metadata(self, match_id: int) -> Dict[str, Any]:
+        return await self._request("GET", f"/v1/matches/{match_id}/metadata")
+
     # -- Analytics -----------------------------------------------------------
 
     async def get_hero_stats(self, **filters: Any) -> List[Dict[str, Any]]:
@@ -145,6 +158,15 @@ class DeadlockAPIClient:
     async def get_item_stats(self, **filters: Any) -> List[Dict[str, Any]]:
         data = await self._request("GET", "/v1/analytics/item-stats", params=filters)
         return data or []
+
+    async def get_hero_counter_stats(self) -> List[Dict[str, Any]]:
+        """Full hero x enemy-hero win/loss matrix. Not filterable server-side
+        (confirmed live -- an enemy_hero_id query param is silently ignored),
+        so this is cached like the static assets and filtered client-side.
+        """
+        return await self._get_cached_list(
+            "hero_counters", "/v1/analytics/hero-counter-stats"
+        )
 
     async def get_leaderboard(
         self, region: str, hero_id: Optional[int] = None
@@ -190,22 +212,45 @@ class DeadlockAPIClient:
         items = await self.get_items()
         return {i["id"]: i.get("name", f"Item {i['id']}") for i in items}
 
-    async def resolve_rank_name(self, badge: Optional[int]) -> Optional[str]:
-        """Best-effort tier-name resolution for a rank `badge` value
-        (badge = tier * 10 + subrank). The exact /v1/assets/ranks response
-        shape wasn't verified against a live payload during design, so this
-        degrades gracefully to a numeric tier label if the expected fields
-        aren't present -- worth double-checking against a live response
-        before relying on it for display polish.
+    async def items_by_id(self) -> Dict[int, Dict[str, Any]]:
+        items = await self.get_items()
+        return {i["id"]: i for i in items}
+
+    async def items_by_class_name(self) -> Dict[str, Dict[str, Any]]:
+        """/v1/assets/items covers shop items *and* hero weapons/abilities
+        (distinguished by a "type" field: "upgrade" | "weapon" | "ability").
+        Keyed by class_name since that's how a hero's signature/innate
+        abilities reference them in /v1/assets/heroes.
+        """
+        items = await self.get_items()
+        return {i["class_name"]: i for i in items if "class_name" in i}
+
+    async def get_hero_by_id(self, hero_id: int) -> Optional[Dict[str, Any]]:
+        heroes = await self.get_heroes()
+        for h in heroes:
+            if h.get("id") == hero_id:
+                return h
+        return None
+
+    async def resolve_rank_info(self, badge: Optional[int]) -> Optional[Dict[str, Any]]:
+        """Resolve a rank `badge` value (badge = tier * 10 + subrank) to its
+        tier's {tier, name, images, color} record from /v1/assets/ranks.
+        Falls back to a synthetic {"tier": N, "name": "Tier N"} record if the
+        tier isn't found or the assets endpoint is unreachable.
         """
         if badge is None:
             return None
         tier = badge // 10
+        fallback = {"tier": tier, "name": f"Tier {tier}", "images": {}, "color": None}
         try:
             ranks = await self.get_ranks()
         except UpstreamUnavailableError:
-            return f"Tier {tier}"
+            return fallback
         for r in ranks:
             if r.get("tier") == tier:
-                return r.get("name") or r.get("tier_name") or f"Tier {tier}"
-        return f"Tier {tier}"
+                return r
+        return fallback
+
+    async def resolve_rank_name(self, badge: Optional[int]) -> Optional[str]:
+        info = await self.resolve_rank_info(badge)
+        return info.get("name") if info else None

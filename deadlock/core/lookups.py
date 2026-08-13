@@ -21,9 +21,9 @@ async def build_full_profile_embed(api: DeadlockAPIClient, account_id: int) -> d
     except PlayerNotFoundError:
         rank = None
 
-    rank_name = await api.resolve_rank_name(rank.get("badge") if rank else None)
+    rank_info = await api.resolve_rank_info(rank.get("badge") if rank else None)
     rank_image_url = api.rank_image_url(account_id) if rank else None
 
     return build_profile_embed(
-        profile=profile, rank=rank, rank_name=rank_name, rank_image_url=rank_image_url
+        profile=profile, rank=rank, rank_info=rank_info, rank_image_url=rank_image_url
     )
