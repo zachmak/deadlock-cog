@@ -6,7 +6,7 @@ from __future__ import annotations
 
 import asyncio
 import logging
-from typing import Any, Dict, List
+from typing import Any, Dict, List, Optional
 
 import aiohttp
 from redbot.core.bot import Red
@@ -22,6 +22,19 @@ REQUEST_TIMEOUT = aiohttp.ClientTimeout(total=10)
 class SteamNewsClient:
     def __init__(self, bot: Red) -> None:
         self.bot = bot
+        self._session: Optional[aiohttp.ClientSession] = None
+
+    async def _get_session(self) -> aiohttp.ClientSession:
+        # Red's Bot doesn't expose a shared aiohttp session, so this client
+        # owns and lazily creates its own, closed via close() from the
+        # cog's cog_unload.
+        if self._session is None or self._session.closed:
+            self._session = aiohttp.ClientSession()
+        return self._session
+
+    async def close(self) -> None:
+        if self._session is not None and not self._session.closed:
+            await self._session.close()
 
     async def get_news(
         self, *, count: int = 20, maxlength: int = 0
@@ -33,7 +46,8 @@ class SteamNewsClient:
             "format": "json",
         }
         try:
-            async with self.bot.session.get(
+            session = await self._get_session()
+            async with session.get(
                 STEAM_NEWS_URL, params=params, timeout=REQUEST_TIMEOUT
             ) as resp:
                 if resp.status >= 400:

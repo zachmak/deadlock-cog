@@ -57,6 +57,8 @@ class Deadlock(
 
     async def cog_unload(self) -> None:
         self._stop_news_engine()
+        await self.api.close()
+        await self.steam_news.close()
 
     async def red_delete_data_for_user(self, *, requester: Any, user_id: int) -> None:
         await self.config.user_from_id(user_id).clear()

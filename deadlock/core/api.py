@@ -29,6 +29,19 @@ class DeadlockAPIClient:
     def __init__(self, bot: Red) -> None:
         self.bot = bot
         self._asset_cache: Dict[str, tuple[float, List[dict]]] = {}
+        self._session: Optional[aiohttp.ClientSession] = None
+
+    async def _get_session(self) -> aiohttp.ClientSession:
+        # Red's Bot doesn't expose a shared aiohttp session, so this client
+        # owns and lazily creates its own, closed via close() from the
+        # cog's cog_unload.
+        if self._session is None or self._session.closed:
+            self._session = aiohttp.ClientSession()
+        return self._session
+
+    async def close(self) -> None:
+        if self._session is not None and not self._session.closed:
+            await self._session.close()
 
     async def _get_api_key(self) -> Optional[str]:
         tokens = await self.bot.get_shared_api_tokens(DEADLOCK_API_TOKEN_SERVICE)
@@ -44,7 +57,8 @@ class DeadlockAPIClient:
             headers["X-API-KEY"] = api_key
 
         try:
-            async with self.bot.session.request(
+            session = await self._get_session()
+            async with session.request(
                 method, url, params=params, headers=headers, timeout=REQUEST_TIMEOUT
             ) as resp:
                 if resp.status == 404:
