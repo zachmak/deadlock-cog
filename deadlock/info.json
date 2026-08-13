@@ -1,0 +1,12 @@
+{
+    "author": ["Zach"],
+    "min_bot_version": "3.5.0",
+    "min_python_version": [3, 9, 0],
+    "description": "Deadlock (Valve) player profile/rank lookup, match history, hero and item win-rate analytics, regional leaderboards, Steam account linking, and a per-server configurable patch-note/news poller backed by deadlock-api.com and Valve's Steam news feed.",
+    "short": "Deadlock player stats, hero/item analytics, leaderboards, and patch-note news.",
+    "name": "Deadlock",
+    "tags": ["deadlock", "valve", "steam", "stats", "gaming", "moba", "news"],
+    "type": "COG",
+    "install_msg": "Thanks for installing Deadlock! Run `[p]help Deadlock` to get started. Optionally set a deadlock-api.com key for higher rate limits with `[p]set api deadlockapi api_key,<key>`.",
+    "end_user_data_statement": "This cog stores the Discord user ID and linked Deadlock/Steam account ID of users who opt in via the account-link command, and per-server configuration (channels, feature toggles, watermarks) for server administrators. No message content is stored."
+}
