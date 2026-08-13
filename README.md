@@ -22,7 +22,7 @@ properties. Stat data is provided by the third-party
 ## Installation
 
 ```
-[p]repo add deadlock-cog https://github.com/<your-username>/deadlock-cog
+[p]repo add deadlock-cog https://github.com/zachmak/deadlock-cog
 [p]cog install deadlock-cog deadlock
 [p]load deadlock
 ```
