@@ -10,6 +10,7 @@ import discord
 from .api import DeadlockAPIClient
 from .errors import PlayerNotFoundError, UpstreamUnavailableError
 from .formatting import build_profile_embed
+from .stats import filter_ranked, summarize_matches
 
 
 async def build_full_profile_embed(api: DeadlockAPIClient, account_id: int) -> discord.Embed:
@@ -31,34 +32,30 @@ async def build_full_profile_embed(api: DeadlockAPIClient, account_id: int) -> d
     rank_info = await api.resolve_rank_info(rank.get("badge")) if is_ranked else None
     rank_image_url = api.rank_image_url(account_id) if is_ranked else None
 
-    hero_stats = []
     try:
-        hero_stats = await api.get_player_hero_stats(account_id)
+        history = await api.get_match_history(account_id)
     except UpstreamUnavailableError:
-        pass
+        history = []
 
-    total_matches = sum(h.get("matches_played", 0) for h in hero_stats)
-    total_wins = sum(h.get("wins", 0) for h in hero_stats)
-    total_kills = sum(h.get("kills", 0) for h in hero_stats)
-    total_deaths = sum(h.get("deaths", 0) for h in hero_stats)
-    total_assists = sum(h.get("assists", 0) for h in hero_stats)
+    overall = summarize_matches(history)
+    ranked_summary = summarize_matches(filter_ranked(history))
 
-    win_rate = (total_wins / total_matches) if total_matches else None
-    kda = ((total_kills + total_assists) / max(total_deaths, 1)) if total_matches else None
-
-    top_hero_name = None
-    if hero_stats:
+    most_played_hero_name = None
+    if overall.most_played_hero_id is not None:
         hero_names = await api.hero_name_map()
-        top = max(hero_stats, key=lambda h: h.get("matches_played", 0))
-        top_hero_name = hero_names.get(top.get("hero_id"))
+        most_played_hero_name = hero_names.get(overall.most_played_hero_id)
+
+    season_name = None
+    if ranked_summary.total_matches:
+        season_name = await api.current_ranked_season_name()
 
     return build_profile_embed(
         profile=profile,
         rank=rank,
         rank_info=rank_info,
         rank_image_url=rank_image_url,
-        total_matches=total_matches,
-        win_rate=win_rate,
-        kda=kda,
-        top_hero_name=top_hero_name,
+        overall=overall,
+        most_played_hero_name=most_played_hero_name,
+        ranked_summary=ranked_summary,
+        season_name=season_name,
     )

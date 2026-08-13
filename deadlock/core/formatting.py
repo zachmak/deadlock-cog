@@ -12,6 +12,7 @@ from typing import Any, Dict, List, Optional, Sequence
 import discord
 
 from .constants import EMBED_COLOR, ERROR_COLOR
+from .stats import MatchStatsSummary
 
 _HTML_TAG_RE = re.compile(r"<[^>]+>")
 
@@ -50,16 +51,80 @@ def _parse_hex_color(color: Optional[str]) -> Optional[int]:
         return None
 
 
+def _format_date(ts: Optional[int]) -> str:
+    if not ts:
+        return "—"
+    return datetime.datetime.fromtimestamp(ts, tz=datetime.timezone.utc).strftime(
+        "%Y-%m-%d"
+    )
+
+
+def _format_match_duration(seconds: Optional[int]) -> str:
+    if seconds is None:
+        return "—"
+    minutes, secs = divmod(int(seconds), 60)
+    return f"{minutes}m {secs}s"
+
+
+def _rank_label(rank: Optional[Dict[str, Any]], rank_info: Optional[Dict[str, Any]]) -> str:
+    if not rank_info:
+        return "Unranked"
+    label = rank_info.get("name", "Unranked")
+    subrank = (rank or {}).get("subrank")
+    return f"{label} {subrank}" if subrank else label
+
+
+def _overall_stats_block(
+    overall: MatchStatsSummary, most_played_hero_name: Optional[str]
+) -> str:
+    lines = []
+    if most_played_hero_name:
+        lines.append(
+            f"**Most Played:** {most_played_hero_name} "
+            f"({overall.most_played_hero_matches} matches)"
+        )
+    lines.append(f"**Total Matches:** {overall.total_matches}")
+    if overall.win_rate is not None:
+        lines.append(
+            f"**Win Rate:** {overall.win_rate:.2%} ({overall.wins}-{overall.losses})"
+        )
+    if overall.kda is not None:
+        lines.append(f"**KDA:** {overall.kda:.2f}")
+    lines.append(f"**First Match:** {_format_date(overall.first_match_time)}")
+    lines.append(f"**Last Match:** {_format_date(overall.last_match_time)}")
+    lines.append(f"**Left Early:** {overall.abandons} time(s)")
+    if overall.most_kills is not None:
+        lines.append(f"**Most Kills (game):** {overall.most_kills}")
+    if overall.most_deaths is not None:
+        lines.append(f"**Most Deaths (game):** {overall.most_deaths}")
+    if overall.most_assists is not None:
+        lines.append(f"**Most Assists (game):** {overall.most_assists}")
+    if overall.longest_match_s is not None:
+        lines.append(f"**Longest Match:** {_format_match_duration(overall.longest_match_s)}")
+    if overall.most_souls is not None:
+        lines.append(f"**Most Souls:** {overall.most_souls:,}")
+    return "\n".join(lines)
+
+
+def _ranked_stats_block(
+    ranked: MatchStatsSummary, rank: Optional[Dict[str, Any]], rank_info: Optional[Dict[str, Any]]
+) -> str:
+    lines = [f"**Rank:** {_rank_label(rank, rank_info)}"]
+    lines.append(f"**Win Rate:** {ranked.win_rate:.2%} ({ranked.wins}-{ranked.losses})")
+    lines.append(f"**KDA:** {ranked.kda:.2f}")
+    return "\n".join(lines)
+
+
 def build_profile_embed(
     *,
     profile: Dict[str, Any],
     rank: Optional[Dict[str, Any]],
     rank_info: Optional[Dict[str, Any]],
     rank_image_url: Optional[str],
-    total_matches: int = 0,
-    win_rate: Optional[float] = None,
-    kda: Optional[float] = None,
-    top_hero_name: Optional[str] = None,
+    overall: MatchStatsSummary,
+    most_played_hero_name: Optional[str] = None,
+    ranked_summary: Optional[MatchStatsSummary] = None,
+    season_name: Optional[str] = None,
 ) -> discord.Embed:
     flag = _country_flag(profile.get("countrycode"))
     name = profile.get("personaname") or f"Account {profile.get('account_id')}"
@@ -73,14 +138,10 @@ def build_profile_embed(
     if avatar:
         embed.set_thumbnail(url=avatar)
     if rank_info:
-        rank_label = rank_info.get("name", "Unranked")
-        subrank = (rank or {}).get("subrank")
-        if subrank:
-            rank_label = f"{rank_label} {subrank}"
         rank_icon = (rank_info.get("images") or {}).get("small") or (
             rank_info.get("images") or {}
         ).get("large")
-        embed.set_author(name=rank_label, icon_url=rank_icon)
+        embed.set_author(name=_rank_label(rank, rank_info), icon_url=rank_icon)
         if rank_image_url:
             embed.set_image(url=rank_image_url)
     elif rank is not None:
@@ -88,6 +149,25 @@ def build_profile_embed(
         # account has never completed a ranked match, distinct from a real
         # (if low) tier, so don't imply an earned rank tier name.
         embed.set_author(name="Unranked")
+
+    if overall.total_matches:
+        embed.add_field(
+            name="\U0001F4CA Overall Stats",
+            value=_overall_stats_block(overall, most_played_hero_name),
+            inline=False,
+        )
+    else:
+        embed.add_field(name="\U0001F4CA Overall Stats", value="No match data found.", inline=False)
+
+    if ranked_summary and ranked_summary.total_matches:
+        title = (
+            f"\U0001F3C6 Ranked — {season_name}" if season_name else "\U0001F3C6 Ranked Stats"
+        )
+        embed.add_field(
+            name=title,
+            value=_ranked_stats_block(ranked_summary, rank, rank_info),
+            inline=False,
+        )
 
     last_match = (rank or {}).get("last_match") or {}
     if last_match.get("match_id"):
@@ -100,15 +180,6 @@ def build_profile_embed(
             ),
             inline=False,
         )
-
-    if total_matches:
-        embed.add_field(name="Matches", value=str(total_matches), inline=True)
-    if win_rate is not None:
-        embed.add_field(name="Win Rate", value=f"{win_rate:.1%}", inline=True)
-    if kda is not None:
-        embed.add_field(name="KDA", value=f"{kda:.2f}", inline=True)
-    if top_hero_name:
-        embed.add_field(name="Most Played", value=top_hero_name, inline=True)
 
     matches_30d = profile.get("matches_played_last_30d")
     if matches_30d is not None:

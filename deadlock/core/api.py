@@ -204,6 +204,33 @@ class DeadlockAPIClient:
     async def get_ranks(self) -> List[Dict[str, Any]]:
         return await self._get_cached_list("ranks", "/v1/assets/ranks")
 
+    async def get_ranked_seasons(self) -> List[Dict[str, Any]]:
+        return await self._get_cached_list(
+            "ranked_seasons", "/v1/assets/ranked-seasons"
+        )
+
+    async def current_ranked_season_name(self) -> Optional[str]:
+        try:
+            seasons = await self.get_ranked_seasons()
+        except UpstreamUnavailableError:
+            return None
+        if not seasons:
+            return None
+
+        now = time.time()
+        for season in seasons:
+            for interval in season.get("intervals") or []:
+                start = interval.get("start_timestamp", 0)
+                end = interval.get("end_timestamp", float("inf"))
+                if start <= now <= end:
+                    return season.get("name")
+
+        def _latest_end(season: Dict[str, Any]) -> float:
+            ends = [i.get("end_timestamp", 0) for i in season.get("intervals") or []]
+            return max(ends) if ends else 0
+
+        return max(seasons, key=_latest_end).get("name")
+
     async def hero_name_map(self) -> Dict[int, str]:
         heroes = await self.get_heroes()
         return {h["id"]: h.get("name", f"Hero {h['id']}") for h in heroes}
