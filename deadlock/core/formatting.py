@@ -56,6 +56,10 @@ def build_profile_embed(
     rank: Optional[Dict[str, Any]],
     rank_info: Optional[Dict[str, Any]],
     rank_image_url: Optional[str],
+    total_matches: int = 0,
+    win_rate: Optional[float] = None,
+    kda: Optional[float] = None,
+    top_hero_name: Optional[str] = None,
 ) -> discord.Embed:
     flag = _country_flag(profile.get("countrycode"))
     name = profile.get("personaname") or f"Account {profile.get('account_id')}"
@@ -77,12 +81,18 @@ def build_profile_embed(
             rank_info.get("images") or {}
         ).get("large")
         embed.set_author(name=rank_label, icon_url=rank_icon)
-    if rank_image_url:
-        embed.set_image(url=rank_image_url)
+        if rank_image_url:
+            embed.set_image(url=rank_image_url)
+    elif rank is not None:
+        # `rank` was fetched successfully but has no last_match -- this
+        # account has never completed a ranked match, distinct from a real
+        # (if low) tier, so don't imply an earned rank tier name.
+        embed.set_author(name="Unranked")
+
     last_match = (rank or {}).get("last_match") or {}
     if last_match.get("match_id"):
         embed.add_field(
-            name="Last Match",
+            name="Last Ranked Match",
             value=(
                 f"Match `{last_match['match_id']}` — "
                 f"rank progress {last_match.get('player_rank_initial_flat_progress', '?')} → "
@@ -90,6 +100,16 @@ def build_profile_embed(
             ),
             inline=False,
         )
+
+    if total_matches:
+        embed.add_field(name="Matches", value=str(total_matches), inline=True)
+    if win_rate is not None:
+        embed.add_field(name="Win Rate", value=f"{win_rate:.1%}", inline=True)
+    if kda is not None:
+        embed.add_field(name="KDA", value=f"{kda:.2f}", inline=True)
+    if top_hero_name:
+        embed.add_field(name="Most Played", value=top_hero_name, inline=True)
+
     matches_30d = profile.get("matches_played_last_30d")
     if matches_30d is not None:
         embed.add_field(name="Matches (30d)", value=str(matches_30d), inline=True)
