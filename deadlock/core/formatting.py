@@ -184,6 +184,16 @@ def build_profile_embed(
     matches_30d = profile.get("matches_played_last_30d")
     if matches_30d is not None:
         embed.add_field(name="Matches (30d)", value=str(matches_30d), inline=True)
+
+    if overall.total_matches:
+        # deadlock-api only has full match history for accounts that have
+        # friended one of its Steam bots (Patreon-gated); otherwise it only
+        # has whatever matches it happened to observe indirectly, which can
+        # be well below the account's true in-game total.
+        embed.set_footer(
+            text="Match totals reflect what deadlock-api has recorded, which "
+            "may be less than your true in-game total."
+        )
     return embed
 
 
