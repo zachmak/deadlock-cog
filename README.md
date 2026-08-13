@@ -63,6 +63,7 @@ public unauthenticated rate limits.
 | `deadlock build <hero>` | Best-performing items for a hero, by win rate. |
 | `deadlock leaderboard <region> [hero]` | Regional ranked player leaderboard. |
 | `deadlock random` | Pick a random hero to play. |
+| `deadlock patch` | Show the latest Deadlock patch notes on demand. |
 
 `synergy`/`rivals` are derived, not a direct API feature -- they analyze your
 recent match history (capped at 20 matches) by fetching each match's full

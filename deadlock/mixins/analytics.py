@@ -26,6 +26,7 @@ from ..core.formatting import (
     build_item_info_embed,
     build_item_stats_embeds,
     build_leaderboard_embeds,
+    build_news_embed,
     build_random_hero_embed,
 )
 from ..core.groups import deadlock
@@ -280,4 +281,18 @@ class AnalyticsCommands:
                 return
             hero = random.choice(playable)
             embed = build_random_hero_embed(hero=hero)
+            await ctx.send(embed=embed)
+
+    @deadlock.command(name="patch", aliases=["patchnotes"])
+    @stats_enabled_check()
+    async def deadlock_patch(self, ctx: commands.Context) -> None:
+        """Show the latest Deadlock patch notes."""
+        async with api_error_handler(ctx):
+            # get_news() already sorts newest-first.
+            items = await self.steam_news.get_news(count=20, maxlength=0)
+            patch_items = [i for i in items if "patchnotes" in i.get("tags", [])]
+            if not patch_items:
+                await ctx.send("Couldn't find any recent patch notes.")
+                return
+            embed = build_news_embed(patch_items[0], max_length=3900)
             await ctx.send(embed=embed)

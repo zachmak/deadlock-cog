@@ -15,6 +15,7 @@ from .constants import EMBED_COLOR, ERROR_COLOR
 from .stats import MatchStatsSummary
 
 _HTML_TAG_RE = re.compile(r"<[^>]+>")
+_BBCODE_TAG_RE = re.compile(r"\[/?[a-zA-Z0-9*][^\[\]]*\]")
 
 
 def error_embed(title: str, description: str) -> discord.Embed:
@@ -30,6 +31,18 @@ def _strip_html(text: Optional[str]) -> str:
     if not text:
         return ""
     return _HTML_TAG_RE.sub("", text).strip()
+
+
+def _strip_bbcode(text: Optional[str]) -> str:
+    """Steam's news `contents` field uses forum BBCode ([p], [list], [*],
+    [b], [url=...], etc.), which Discord doesn't render -- strip tags for a
+    plain, readable line. Not a BBCode-to-Markdown converter, just tag
+    removal (verified live: a real patch note came through with a leading
+    stray "[p]" tag before this fix).
+    """
+    if not text:
+        return ""
+    return _BBCODE_TAG_RE.sub("", text).strip()
 
 
 def _country_flag(country_code: Optional[str]) -> str:
@@ -95,8 +108,6 @@ def _overall_stats_block(
     lines.append(f"**Left Early:** {overall.abandons} time(s)")
     if overall.most_kills is not None:
         lines.append(f"**Most Kills (game):** {overall.most_kills}")
-    if overall.most_deaths is not None:
-        lines.append(f"**Most Deaths (game):** {overall.most_deaths}")
     if overall.most_assists is not None:
         lines.append(f"**Most Assists (game):** {overall.most_assists}")
     if overall.longest_match_s is not None:
@@ -267,10 +278,10 @@ def build_leaderboard_embeds(
     return _paginate_rows(title=title, rows=lines, per_page=20)
 
 
-def build_news_embed(item: Dict[str, Any]) -> discord.Embed:
-    contents = item.get("contents") or ""
-    if len(contents) > 1000:
-        contents = contents[:1000].rsplit(" ", 1)[0] + "…"
+def build_news_embed(item: Dict[str, Any], *, max_length: int = 1000) -> discord.Embed:
+    contents = _strip_bbcode(item.get("contents"))
+    if len(contents) > max_length:
+        contents = contents[:max_length].rsplit(" ", 1)[0] + "…"
     embed = discord.Embed(
         title=item.get("title", "Deadlock News"),
         url=item.get("url"),
